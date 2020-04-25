@@ -1,18 +1,14 @@
 /*
   i18n.h - internationalization for Tasmota
-
   Copyright (C) 2020  Theo Arends
-
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -566,6 +562,7 @@
 #define D_CMND_SHUTTER_ENABLEENDSTOPTIME "EnableEndStopTime"
 #define D_CMND_SHUTTER_INVERTWEBBUTTONS "InvertWebButtons"
 
+
 // Commands xdrv_32_hotplug.ino
 #define D_CMND_HOTPLUG "HotPlug"
 
@@ -573,6 +570,12 @@
 #ifdef USE_PWM_DIMMER
 #define D_CMND_BRI_PRESET "BriPreset"
 #endif
+
+// Commands xdrv_36_keeloq.ino 
+#define D_PRFX_KEELOQ "Keeloq"
+#define D_CMND_KEELOQ_SET "Set"
+#define D_CMND_KEELOQ_SENDRAW "SendRaw"
+#define D_CMND_KEELOQ_SENDBUTTON "SendButton"
 
 // Commands xdrv_38_ping.ino
 #define D_CMND_PING "Ping"
