@@ -573,9 +573,10 @@
 
 // Commands xdrv_36_keeloq.ino 
 #define D_PRFX_KEELOQ "Keeloq"
-#define D_CMND_KEELOQ_SET "Set"
-#define D_CMND_KEELOQ_SENDRAW "SendRaw"
+#define D_CMND_KEELOQ_SET_KEYS "SetKeys"
+#define D_CMND_KEELOQ_SET_REMOTE "SetRemote"
 #define D_CMND_KEELOQ_SENDBUTTON "SendButton"
+#define D_CMND_KEELOQ_SENDRAW "SendRaw"
 
 // Commands xdrv_38_ping.ino
 #define D_CMND_PING "Ping"

@@ -526,23 +526,23 @@ struct {
   uint16_t      pms_wake_interval;         // F34
   uint8_t       config_version;            // F36
 
-  uint8_t       free_f37[129];             // F37 - Decrement if adding new Setting variables just above and below
+  uint8_t       free_f37[105];             // F37 - Decrement if adding new Setting variables just above and below
 
   // Only 32 bit boundary variables below
   uint16_t      pulse_counter_debounce_low;  // FB8
   uint16_t      pulse_counter_debounce_high; // FBA
   uint32_t      keeloq_master_msb;         // FBC
   uint32_t      keeloq_master_lsb;         // FC0
-  uint32_t      keeloq_serial;             // FC4
-  uint32_t      keeloq_count;              // FC8
-  uint32_t      device_group_share_in;     // FCC - Bitmask of device group items imported
-  uint32_t      device_group_share_out;    // FD0 - Bitmask of device group items exported
-  uint32_t      bootcount_reset_time;      // FD4
-  int           adc_param4;                // FD8
-  uint32_t      shutter_button[MAX_KEYS];  // FDC
-  uint32_t      i2c_drivers[3];            // FEC I2cDriver
-  uint32_t      cfg_timestamp;             // FF8
-  uint32_t      cfg_crc32;                 // FFC
+  uint32_t      keeloq_serial[MAX_KEELOQ];  // FC4
+  uint32_t      keeloq_count[MAX_KEELOQ];   //FD4
+  uint32_t      device_group_share_in;     // FE4 - Bitmask of device group items imported
+  uint32_t      device_group_share_out;    // FE8 - Bitmask of device group items exported
+  uint32_t      bootcount_reset_time;      // FEC
+  int           adc_param4;                // FF0
+  uint32_t      shutter_button[MAX_KEYS];  // FF4
+  uint32_t      i2c_drivers[3];            // 1004 I2cDriver
+  uint32_t      cfg_timestamp;             // 1008
+  uint32_t      cfg_crc32;                 // 100C
 } Settings;
 
 typedef struct {

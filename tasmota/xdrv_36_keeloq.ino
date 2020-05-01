@@ -21,10 +21,15 @@
 /*********************************************************************************************\
  * Keeloq shutter support
  *
- * Uses hardware SPI and two user configurable GPIO's (CC1101 GDO0 and CC1101 GDO2)
- *
- * Considering the implementation these two user GPIO's are fake.
+ * Uses hardware 
+ * either :SPI and two user configurable GPIO's (CC1101 GDO0 and CC1101 GDO2)
+ * * Considering the implementation these two user GPIO's are fake.
  * Only CC1101 GDO0 is used and must always be GPIO05 dictated by the used CC1101 library.
+ * 
+ * or send vie sonoff RF bridge via serial port
+ * 
+ *
+ *
 \*********************************************************************************************/
 
 #define XDRV_36 36
@@ -50,10 +55,9 @@
 void sendKeeloqPacket();
 
 const char kJaroliftCommands[] PROGMEM = D_PRFX_KEELOQ "|" // keeloq prefix
-D_CMND_KEELOQ_SENDRAW "|" D_CMND_KEELOQ_SENDBUTTON  "|" D_CMND_KEELOQ_SET;
+ D_CMND_KEELOQ_SET_KEYS "|" D_CMND_KEELOQ_SET_REMOTE "|" D_CMND_KEELOQ_SENDBUTTON  "|"  D_CMND_KEELOQ_SENDRAW ;
 
-void (* const jaroliftCommand[])(void) PROGMEM = {
-  &CmndSendRaw, &CmdSendButton, &CmdSet};
+void (* const jaroliftCommand[])(void) PROGMEM = {&CmdSetKeys, &CmdSetRemote, &CmdSendButton,&CmdSendRaw};
 
 #if KeeLoqSend == CC1101
 CC1101 cc1101;
@@ -73,34 +77,55 @@ struct JAROLIFT_DEVICE {
   uint8_t port_rx;
 } jaroliftDevice;
 
-void CmdSet(void)
+void CmdSetKeys(void)
 {
   if (XdrvMailbox.data_len > 0) {
-    if (XdrvMailbox.payload > 0) {
       char *p;
       uint32_t i = 0;
-      uint32_t param[4] = { 0 };
-      for (char *str = strtok_r(XdrvMailbox.data, ", ", &p); str && i < 4; str = strtok_r(nullptr, ", ", &p)) {
+      uint32_t param[2] = { 0 };
+      DEBUG_DRIVER_LOG( PSTR("KeeloqSetKeys->params: %s,len:%d"), XdrvMailbox.data,XdrvMailbox.data_len);
+      for (char *str = strtok_r(XdrvMailbox.data, ", ", &p); str && i < 2; str = strtok_r(nullptr, ", ", &p)) {
         param[i] = strtoul(str, nullptr, 0);
         i++;
       }
-      for (uint32_t i = 0; i < 3; i++) {
-        if (param[i] < 1) { param[i] = 1; }  // msb, lsb, serial, counter
+      for (uint32_t i = 0; i < 2; i++) {
+        if (param[i] < 0) { 
+          DEBUG_DRIVER_LOG( PSTR("invalid keys"));
+          return;
+         }  
       }
-      DEBUG_DRIVER_LOG( PSTR("params: %08x %08x %08x %08x"), param[0], param[1], param[2], param[3]);
+      DEBUG_DRIVER_LOG( PSTR("KeeloqSetKeys:params: msb:%08x lsb:%08x"), param[0], param[1]);
       Settings.keeloq_master_msb = param[0];
       Settings.keeloq_master_lsb = param[1];
-      Settings.keeloq_serial = param[2];
-      Settings.keeloq_count = param[3];
-
-      jaroliftDevice.serial = param[2];
-      jaroliftDevice.count = param[3];
-
-      GenerateDeviceCryptKey();
+      
       ResponseCmndDone();
-    } else {
-      DEBUG_DRIVER_LOG( PSTR("no payload"));
-    }
+  } else {
+    DEBUG_DRIVER_LOG( PSTR("KeeloqSetKeys: no param"));
+  }
+}
+
+void CmdSetRemote(void)
+{
+  if (XdrvMailbox.data_len > 0) {
+      char *p;
+      uint32_t i = 0;
+      uint32_t param[3] = { 0 };
+      DEBUG_DRIVER_LOG( PSTR("KeeloqSetremote->params: %s,len:%d"), XdrvMailbox.data,XdrvMailbox.data_len);
+      for (char *str = strtok_r(XdrvMailbox.data, ", ", &p); str && i < 3; str = strtok_r(nullptr, ", ", &p)) {
+        param[i] = strtoul(str, nullptr, 0);
+        i++;
+      }
+      
+      DEBUG_DRIVER_LOG( PSTR("KeeloqSetremote->params:serial:%08x count:%08x slotNb:%08x"), param[0], param[1], param[2]);
+      if (param[2]<1 || param[2] > MAX_KEELOQ){
+        DEBUG_DRIVER_LOG( PSTR("KeeloqSetremote->slot nb out of range"));
+        return;
+      }
+
+      Settings.keeloq_serial[param[2]-1] = param[0];  // commands key nb start at 1: param[0]-> serial nb
+      Settings.keeloq_count[param[2]-1] = param[1];   // param [1]-->counter
+      
+      ResponseCmndDone();
   } else {
     DEBUG_DRIVER_LOG( PSTR("no param"));
   }
@@ -123,19 +148,38 @@ void CmdSendButton(void)
   {
     if (XdrvMailbox.payload > 0)
     {
-      jaroliftDevice.button = strtoul(XdrvMailbox.data, nullptr, 0);
-      DEBUG_DRIVER_LOG( PSTR("msb: %08x"), jaroliftDevice.device_key_msb);
-      DEBUG_DRIVER_LOG( PSTR("lsb: %08x"), jaroliftDevice.device_key_lsb);
-      DEBUG_DRIVER_LOG( PSTR("serial: %08x"), jaroliftDevice.serial);
-      DEBUG_DRIVER_LOG( PSTR("disc: %08x"), jaroliftDevice.disc);
-      DEBUG_DRIVER_LOG( PSTR("button: 0X%x"), jaroliftDevice.button);
-      DEBUG_DRIVER_LOG( PSTR("pack: 0X%lx"), jaroliftDevice.pack);
+      char *p;
+      uint32_t i = 0;
+      uint32_t param[2] = { 0 };
+      uint32_t remoteIndex;
 
+      for (char *str = strtok_r(XdrvMailbox.data, ", ", &p); str && i < 2; str = strtok_r(nullptr, ", ", &p)) {
+        param[i] = strtoul(str, nullptr, 0);
+        i++;
+      }
+      if (param[0] <0 || param[0] >15){
+        DEBUG_DRIVER_LOG( PSTR("button nb out of range"));
+        return;
+      }
+      if(param[1]> MAX_KEELOQ){  DEBUG_DRIVER_LOG( PSTR("index out of range")); }
+      if(param[1]< 0){  param[1]=1; }
+      DEBUG_DRIVER_LOG( PSTR("KeeloqSendButton->params:button:%08x slotNb:%08x"), param[0], param[1]);
+
+      jaroliftDevice.button = param[0]; 
+      remoteIndex=param[1]-1 ;// slot nb  start at 1
+      KeeloqSetDevice(remoteIndex); 
+    
+      DEBUG_DRIVER_LOG( PSTR("msb: 0X%X"), jaroliftDevice.device_key_msb);
+      DEBUG_DRIVER_LOG( PSTR("lsb: 0X%X"), jaroliftDevice.device_key_lsb);
+      DEBUG_DRIVER_LOG( PSTR("serial: 0X%X"), jaroliftDevice.serial);
+      DEBUG_DRIVER_LOG( PSTR("disc: 0X%X"), jaroliftDevice.disc);
+      DEBUG_DRIVER_LOG( PSTR("button: 0X%X"), jaroliftDevice.button);
+    
       AddLog_P2(LOG_LEVEL_DEBUG, PSTR("KLQ: count: %08x-->%d"), jaroliftDevice.count,jaroliftDevice.count);
 
       CreateKeeloqPacket();
       jaroliftDevice.count++;
-      Settings.keeloq_count = jaroliftDevice.count;
+      Settings.keeloq_count[remoteIndex] = jaroliftDevice.count;
       SendKeeloqPacket();
       
     }
@@ -144,7 +188,7 @@ void CmdSendButton(void)
   ResponseCmndDone();
 }
 
-void CmndSendRaw(void)
+void CmdSendRaw(void)
   {
     DEBUG_DRIVER_LOG( PSTR("cmd send called at %d"), micros());
     #if KeeLoqSend == CC1101
@@ -324,6 +368,11 @@ void CreateKeeloqPacket()
   AddLog_P2(LOG_LEVEL_DEBUG, PSTR("button:  0X%X"), jaroliftDevice.pack>>60 & 0xfL);
   
 }
+void KeeloqSetDevice(uint32_t index){
+  jaroliftDevice.serial = Settings.keeloq_serial[index];
+  jaroliftDevice.count = Settings.keeloq_count[index];
+  GenerateDeviceCryptKey();
+}
 
 void KeeloqInit()
 {
@@ -342,10 +391,7 @@ void KeeloqInit()
 
   pinMode(jaroliftDevice.port_tx, OUTPUT);
   pinMode(jaroliftDevice.port_rx, INPUT_PULLUP);
-
-  jaroliftDevice.serial = Settings.keeloq_serial;
-  jaroliftDevice.count = Settings.keeloq_count;
-  GenerateDeviceCryptKey();
+  
 }
 
 /*********************************************************************************************\
@@ -354,13 +400,16 @@ void KeeloqInit()
 bool Xdrv36(uint8_t function)
 {
   
- // if ((99 == pin[GPIO_CC1101_GDO0]) || (99 == pin[GPIO_CC1101_GDO2])) { return false; }
 
+  #if KeeLoqSend == CC1101
+    if ((99 == pin[GPIO_CC1101_GDO0]) || (99 == pin[GPIO_CC1101_GDO2])) { return false; }
+  #endif
+  
   bool result = false;
 
   switch (function) {
     case FUNC_COMMAND:
-      AddLog_P(LOG_LEVEL_DEBUG_MORE, PSTR("calling command"));
+      AddLog_P2(LOG_LEVEL_DEBUG, PSTR("Xdrv36:calling command"));
       result = DecodeCommand(kJaroliftCommands, jaroliftCommand);
       break;
     case FUNC_INIT:
@@ -368,7 +417,7 @@ bool Xdrv36(uint8_t function)
       DEBUG_DRIVER_LOG( PSTR("init done."));
       break;
   }
-
+  //AddLog_P2(LOG_LEVEL_DEBUG, PSTR("exit  Xdrv36 ;result=%d"),result);
   return result;
 }
 
